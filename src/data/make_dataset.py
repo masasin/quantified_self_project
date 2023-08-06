@@ -72,28 +72,23 @@ class ExerciseDetails(BaseModel):
 def read_data_from_files(files: Iterable[Path]) -> tuple[pd.DataFrame, pd.DataFrame]:
     df_acc = pd.DataFrame()
     df_gyro = pd.DataFrame()
-    id_acc = id_gyro = 0
 
     for file in files:
         if "Accelerometer" in file.stem:
-            id_acc += 1
             df_acc = pd.concat(
                 [
                     df_acc,
                     pd.read_csv(file).assign(
-                        **ExerciseDetails.from_filename(file.stem).to_pandas(),
-                        set_id=id_acc,
+                        **ExerciseDetails.from_filename(file.stem).to_pandas()
                     ),
                 ],
             )
         elif "Gyroscope" in file.stem:
-            id_gyro += 1
             df_gyro = pd.concat(
                 [
                     df_gyro,
                     pd.read_csv(file).assign(
-                        **ExerciseDetails.from_filename(file.stem).to_pandas(),
-                        set_id=id_gyro,
+                        **ExerciseDetails.from_filename(file.stem).to_pandas()
                     ),
                 ]
             )
@@ -161,14 +156,12 @@ def merge_datasets(df_acc: pd.DataFrame, df_gyro: pd.DataFrame) -> pd.DataFrame:
             "wx",
             "wy",
             "wz",
-            "set_id",
             "participant",
             "label",
             "category",
             "set_number",
         ]
     ]
-    df_merged.set_id = df_merged.set_id.astype("int")
     df_merged.set_number = df_merged.set_number.astype("int")
 
     return df_merged
@@ -185,7 +178,6 @@ def resample_data(df_merged: pd.DataFrame, period="200ms") -> pd.DataFrame:
         "wx": "mean",
         "wy": "mean",
         "wz": "mean",
-        "set_id": "last",
         "participant": "last",
         "label": "last",
         "category": "last",
@@ -195,12 +187,17 @@ def resample_data(df_merged: pd.DataFrame, period="200ms") -> pd.DataFrame:
     df_resampled = pd.concat(
         df.resample(period).apply(sampling).dropna() for df in df_by_day
     )
+    df_resampled.set_number = df_resampled.set_number.astype("int")
+
+    time_diff = df_resampled.index.to_series().diff()
+    threshold = pd.Timedelta("3s")
+    new_group_flags = time_diff > threshold
+    df_resampled["set_id"] = new_group_flags.cumsum() + 1
     return df_resampled
 
 
 # %% Main
-if __name__ == "__main__":
-    df_acc, df_gyro = read_data_from_files(data_raw.glob("*.csv"))
-    df_merged = merge_datasets(df_acc, df_gyro)
-    df_resampled = resample_data(df_merged)
-    df_resampled.to_pickle(data_interim / "01_data_processed.pkl")
+df_acc, df_gyro = read_data_from_files(sorted(data_raw.glob("*.csv")))
+df_merged = merge_datasets(df_acc, df_gyro)
+df_resampled = resample_data(df_merged)
+df_resampled.to_pickle(data_interim / "01_data_processed.pkl")
