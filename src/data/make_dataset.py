@@ -1,4 +1,4 @@
-#%% Imports and constants
+# %% Imports and constants
 from __future__ import annotations
 
 import enum
