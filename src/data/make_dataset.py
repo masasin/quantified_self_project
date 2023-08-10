@@ -1,3 +1,4 @@
+#%% Imports and constants
 from __future__ import annotations
 
 import enum
@@ -9,7 +10,7 @@ from typing import Iterable
 import pandas as pd
 from pydantic import BaseModel
 
-data_root = Path("data")
+data_root = Path(__file__).parents[2] / "data"
 data_raw = data_root / "raw/MetaMotion"
 data_interim = data_root / "interim"
 
@@ -33,7 +34,7 @@ class ExerciseDetails(BaseModel):
 
     @classmethod
     def from_filename(cls, filename: str) -> ExerciseDetails:
-        set_data, _, date, _, device, frequency, _ = filename.split("_")
+        set_data, _, _, _, device, frequency, _ = filename.split("_")
 
         match set_data.split("-"):
             case [participant, label, category, *_]:
@@ -201,3 +202,8 @@ df_acc, df_gyro = read_data_from_files(sorted(data_raw.glob("*.csv")))
 df_merged = merge_datasets(df_acc, df_gyro)
 df_resampled = resample_data(df_merged)
 df_resampled.to_pickle(data_interim / "01_data_processed.pkl")
+
+# %% Output for Code Interpreter
+df_resampled[
+    ["ax", "ay", "az", "wx", "wy", "wz", "participant", "label", "category"]
+].to_csv(data_interim / "01_data_processed.csv", index=False)
